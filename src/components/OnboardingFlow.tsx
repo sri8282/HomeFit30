@@ -20,6 +20,7 @@ import {
   saveUserProfile,
   setOnboardingCompleted,
   calculateBMI,
+  getErrorMessage,
 } from '../dataService';
 import { ScrollPicker } from './ScrollPicker';
 import { soundManager } from '../soundService';
@@ -137,6 +138,36 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     }
   };
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleExecuteSave = async () => {
+    setSaveError(null);
+    const finalProfile: Partial<UserProfile> = {
+      name: name.trim() || 'Athlete',
+      gender,
+      age,
+      height,
+      weight,
+      goal,
+      focusArea,
+      equipment: selectedEquipment,
+      createdAt: new Date().toISOString(),
+      onboardingCompleted: true,
+    };
+
+    try {
+      await saveUserProfile(finalProfile);
+      await setOnboardingCompleted(true);
+      soundManager.playSuccessChime();
+
+      setTimeout(() => {
+        onComplete();
+      }, 300);
+    } catch (err) {
+      setSaveError(getErrorMessage(err));
+    }
+  };
+
   // Step 7: 2-second plan creation animation
   useEffect(() => {
     if (step !== 7) return;
@@ -159,26 +190,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
 
       if (elapsed >= duration) {
         clearInterval(interval);
-        // Save all onboarding data exclusively via dataService
-        const finalProfile: Partial<UserProfile> = {
-          name: name.trim() || 'Athlete',
-          gender,
-          age,
-          height,
-          weight,
-          goal,
-          focusArea,
-          equipment: selectedEquipment,
-          createdAt: new Date().toISOString(),
-          onboardingCompleted: true,
-        };
-        saveUserProfile(finalProfile);
-        setOnboardingCompleted(true);
-        soundManager.playSuccessChime();
-
-        setTimeout(() => {
-          onComplete();
-        }, 300);
+        handleExecuteSave();
       }
     }, 40);
 
@@ -856,6 +868,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                 </span>
               </div>
             </div>
+
+            {saveError && (
+              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex flex-col items-center gap-2">
+                <span>{saveError}</span>
+                <button
+                  type="button"
+                  onClick={handleExecuteSave}
+                  className="px-4 py-1.5 rounded-lg bg-rose-500 text-white font-bold text-xs hover:bg-rose-600 transition-colors cursor-pointer"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

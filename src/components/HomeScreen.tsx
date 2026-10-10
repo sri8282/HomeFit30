@@ -47,8 +47,9 @@ import {
   getRestTimeSetting,
   saveRestTimeSetting,
   calculateDayEstimatedMinutes,
+  getErrorMessage,
 } from '../dataService';
-import { logout } from '../authService';
+import { signOut } from '../authService';
 import { WorkoutPlayer } from './WorkoutPlayer';
 import { DayPreviewModal } from './DayPreviewModal';
 import { AnimationPreviewModal } from './AnimationPreviewModal';
@@ -112,12 +113,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('plan');
 
   // Workout data & completions
-  const [completedDays, setCompletedDays] = useState<number[]>(() => getCompletedDays());
-  const [completions, setCompletions] = useState(() => getWorkoutCompletions());
+  const [completedDays, setCompletedDays] = useState<number[]>([]);
+  const [completions, setCompletions] = useState<any[]>([]);
 
   // Weight logs
-  const [weightLogs, setWeightLogs] = useState<WeightEntry[]>(() => getWeightLogs());
-  const [newLogWeight, setNewLogWeight] = useState<number>(() => profile?.weight || 72);
+  const [weightLogs, setWeightLogs] = useState<WeightEntry[]>([]);
+  const [newLogWeight, setNewLogWeight] = useState<number>(profile?.weight || 72);
   const [isAddingWeight, setIsAddingWeight] = useState<boolean>(false);
   const [weightNotice, setWeightNotice] = useState<string | null>(null);
 
@@ -127,10 +128,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [editWeight, setEditWeight] = useState<number>(profile?.weight || 72);
   const [editEquipment, setEditEquipment] = useState<Equipment[]>(profile?.equipment || ['none']);
   const [editFocusArea, setEditFocusArea] = useState<FocusArea>(profile?.focusArea || 'chest');
-  const [restTime, setRestTime] = useState<number>(() => getRestTimeSetting());
+  const [restTime, setRestTime] = useState<number>(20);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [savedSettingsNotice, setSavedSettingsNotice] = useState<string | null>(null);
   const [confirmResetType, setConfirmResetType] = useState<'progress' | 'all' | null>(null);
   const [showAnimationPreview, setShowAnimationPreview] = useState<boolean>(false);
+
+  const refreshData = async () => {
+    try {
+      const [days, comps, wLogs, rTime] = await Promise.all([
+        getCompletedDays(),
+        getWorkoutCompletions(),
+        getWeightLogs(),
+        getRestTimeSetting(),
+      ]);
+      setCompletedDays(days);
+      setCompletions(comps);
+      setWeightLogs(wLogs);
+      setRestTime(rTime);
+    } catch (err) {
+      setSavedSettingsNotice(getErrorMessage(err));
+      setTimeout(() => setSavedSettingsNotice(null), 3500);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, []);
 
   // Keep settings state in sync when profile updates
   useEffect(() => {
@@ -192,14 +216,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [weightLogs]);
 
   // Refresh completion data after workout finishes
-  const handleWorkoutFinished = () => {
-    const updatedCompleted = getCompletedDays();
-    const updatedCompletions = getWorkoutCompletions();
-    setCompletedDays(updatedCompleted);
-    setCompletions(updatedCompletions);
+  const handleWorkoutFinished = async () => {
+    await refreshData();
     setActiveWorkout(null);
     setSelectedDayDetail(null);
-    onRefreshProfile();
+    await onRefreshProfile();
   };
 
   // Day tap handler - preview day routine before starting
@@ -208,14 +229,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   // Handle adding today's weight log
-  const handleAddTodayWeight = () => {
-    const updated = addWeightLog(newLogWeight);
-    setWeightLogs(updated);
-    setEditWeight(newLogWeight);
-    setIsAddingWeight(false);
-    setWeightNotice(`Logged ${newLogWeight} kg successfully!`);
-    onRefreshProfile();
-    setTimeout(() => setWeightNotice(null), 2500);
+  const handleAddTodayWeight = async () => {
+    setIsSaving(true);
+    try {
+      const updated = await addWeightLog(newLogWeight);
+      setWeightLogs(updated);
+      setEditWeight(newLogWeight);
+      setIsAddingWeight(false);
+      setWeightNotice(`Logged ${newLogWeight} kg successfully!`);
+      await onRefreshProfile();
+    } catch (err) {
+      setWeightNotice(getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setWeightNotice(null), 3000);
+    }
   };
 
   // Equipment toggle in settings
@@ -233,38 +261,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
-  // Save Settings & Regenerate Plan
-  const handleSaveSettingsAndRegenerate = () => {
+  // Save Settings & Regenerate Plan (keeps completed days)
+  const handleSaveSettingsAndRegenerate = async () => {
     if (profile) {
-      const updatedProfile: Partial<UserProfile> = {
-        age: editAge,
-        height: editHeight,
-        weight: editWeight,
-        equipment: editEquipment,
-        focusArea: editFocusArea,
-      };
-      saveUserProfile(updatedProfile);
-      saveRestTimeSetting(restTime);
-      onRefreshProfile();
-      setSavedSettingsNotice('Plan regenerated with new equipment & focus area!');
-      setTimeout(() => setSavedSettingsNotice(null), 3000);
+      setIsSaving(true);
+      try {
+        const updatedProfile: Partial<UserProfile> = {
+          age: editAge,
+          height: editHeight,
+          weight: editWeight,
+          equipment: editEquipment,
+          focusArea: editFocusArea,
+        };
+        await saveUserProfile(updatedProfile);
+        await saveRestTimeSetting(restTime);
+        await onRefreshProfile();
+        setSavedSettingsNotice('Plan regenerated with new equipment & focus area!');
+      } catch (err) {
+        setSavedSettingsNotice(getErrorMessage(err));
+      } finally {
+        setIsSaving(false);
+        setTimeout(() => setSavedSettingsNotice(null), 3000);
+      }
     }
   };
 
   // Reset progress only (days 1-30 reset)
-  const handleConfirmResetProgress = () => {
-    resetWorkoutProgress();
-    setCompletedDays([]);
-    setCompletions([]);
-    setConfirmResetType(null);
-    setSavedSettingsNotice('30-day progress reset to Day 1.');
-    setTimeout(() => setSavedSettingsNotice(null), 2500);
+  const handleConfirmResetProgress = async () => {
+    setIsSaving(true);
+    try {
+      await resetWorkoutProgress();
+      setCompletedDays([]);
+      setCompletions([]);
+      setConfirmResetType(null);
+      setSavedSettingsNotice('30-day progress reset to Day 1.');
+    } catch (err) {
+      setSavedSettingsNotice(getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSavedSettingsNotice(null), 3000);
+    }
   };
 
   // Full app reset
-  const handleConfirmResetAll = () => {
-    resetAllData();
-    onResetOnboarding();
+  const handleConfirmResetAll = async () => {
+    setIsSaving(true);
+    try {
+      await resetAllData();
+      onResetOnboarding();
+    } catch (err) {
+      setSavedSettingsNotice(getErrorMessage(err));
+      setIsSaving(false);
+      setTimeout(() => setSavedSettingsNotice(null), 3000);
+    }
   };
 
   const bmiInfo = calculateBMI(editHeight, editWeight);
@@ -1059,11 +1108,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <div>
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={handleSaveSettingsAndRegenerate}
-                className="w-full h-13 rounded-2xl bg-[#A3E635] hover:bg-[#b0f242] active:scale-[0.98] text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-[0_6px_20px_rgba(163,230,53,0.35)] transition-all cursor-pointer font-display"
+                className="w-full h-13 rounded-2xl bg-[#A3E635] hover:bg-[#b0f242] active:scale-[0.98] text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-[0_6px_20px_rgba(163,230,53,0.35)] transition-all cursor-pointer font-display disabled:opacity-50"
               >
-                <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                <span>Save & Regenerate 30-Day Plan</span>
+                {isSaving ? (
+                  <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                    <span>Save & Regenerate 30-Day Plan</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -1120,10 +1176,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </button>
                     <button
                       type="button"
+                      disabled={isSaving}
                       onClick={handleConfirmResetProgress}
-                      className="flex-1 h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold"
+                      className="flex-1 h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center justify-center gap-1"
                     >
-                      Confirm Reset
+                      {isSaving ? (
+                        <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        'Confirm Reset'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1142,7 +1203,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               ) : (
                 <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-800/60 space-y-2">
                   <p className="text-xs text-rose-200 text-center font-medium">
-                    Wipe all local data and return to welcome onboarding flow?
+                    Wipe all data and return to welcome onboarding flow?
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -1154,10 +1215,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </button>
                     <button
                       type="button"
+                      disabled={isSaving}
                       onClick={handleConfirmResetAll}
-                      className="flex-1 h-9 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold"
+                      className="flex-1 h-9 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center justify-center gap-1"
                     >
-                      Confirm Full Wipe
+                      {isSaving ? (
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        'Confirm Full Wipe'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1167,8 +1233,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    try {
+                      await signOut();
+                    } catch (err) {
+                      console.error('Logout error:', err);
+                    }
                     onLogout();
                   }}
                   className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-rose-400 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
@@ -1185,7 +1255,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* ======================================================== */}
       {/* FIXED BOTTOM TAB BAR (PLAN, PROGRESS, SETTINGS)          */}
       {/* ======================================================== */}
-      <div className="shrink-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-3 items-center px-4 py-2 z-30">
+      <div className="shrink-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-3 items-center px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] z-30">
         {/* Tab 1: Plan */}
         <button
           type="button"

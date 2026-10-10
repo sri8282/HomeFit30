@@ -52,7 +52,7 @@ export const AnimationPreviewModal: React.FC<AnimationPreviewModalProps> = ({ on
   return (
     <div className="fixed inset-0 z-50 bg-[#0B1120] text-slate-100 flex flex-col overflow-hidden animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="shrink-0 bg-slate-900/95 border-b border-slate-800 p-4 flex items-center justify-between gap-3">
+      <div className="shrink-0 bg-slate-900/95 border-b border-slate-800 p-4 pt-[max(1rem,env(safe-area-inset-top,0px))] flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
             type="button"

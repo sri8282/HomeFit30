@@ -15,7 +15,7 @@ import {
   Sparkles,
   Layers,
 } from 'lucide-react';
-import { DayWorkout, Exercise, markDayCompleted, getRestTimeSetting } from '../dataService';
+import { DayWorkout, Exercise, markDayCompleted, getRestTimeSetting, getErrorMessage } from '../dataService';
 import { soundManager } from '../soundService';
 import { Confetti } from './Confetti';
 
@@ -38,9 +38,18 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
   const [getReadySeconds, setGetReadySeconds] = useState<number>(3);
 
   // Rest Screen state (configured by user settings)
-  const configuredRest = getRestTimeSetting();
+  const [configuredRest, setConfiguredRest] = useState<number>(20);
   const [isResting, setIsResting] = useState<boolean>(false);
-  const [restSecondsLeft, setRestSecondsLeft] = useState<number>(configuredRest);
+  const [restSecondsLeft, setRestSecondsLeft] = useState<number>(20);
+
+  useEffect(() => {
+    getRestTimeSetting()
+      .then((val) => {
+        setConfiguredRest(val);
+        setRestSecondsLeft(val);
+      })
+      .catch(() => {});
+  }, []);
 
   // Active Exercise Timer
   const [secondsLeft, setSecondsLeft] = useState<number>(30);
@@ -161,7 +170,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
       triggerWorkoutCompletion();
     } else {
       // Transition to rest screen with user's configured rest time
-      setRestSecondsLeft(getRestTimeSetting());
+      setRestSecondsLeft(configuredRest);
       setIsResting(true);
     }
   };
@@ -198,7 +207,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
   };
 
   // Workout Completion & Persist to dataService.ts
-  const triggerWorkoutCompletion = () => {
+  const triggerWorkoutCompletion = async () => {
     setIsCompleted(true);
     soundManager.playSuccessChime();
 
@@ -206,10 +215,14 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
     const caloriesBurned = workout.estimatedCalories;
 
     // Persist via dataService
-    markDayCompleted(workout.day, {
-      durationMinutes,
-      caloriesBurned,
-    });
+    try {
+      await markDayCompleted(workout.day, {
+        durationMinutes,
+        caloriesBurned,
+      });
+    } catch (err) {
+      console.error('Failed to mark day as completed:', err);
+    }
   };
 
   // Format seconds to mm:ss
@@ -224,7 +237,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
   // ========================================================
   if (isCompleted) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-6 overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-6 pt-[max(1.5rem,env(safe-area-inset-top,0px))] pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pl-[max(1.5rem,env(safe-area-inset-left,0px))] pr-[max(1.5rem,env(safe-area-inset-right,0px))] overflow-hidden">
         {/* Full Screen Falling Confetti Component */}
         <Confetti />
 
@@ -287,7 +300,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
   // ========================================================
   if (isGettingReady) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-6 text-center select-none">
+      <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-6 pt-[max(1.5rem,env(safe-area-inset-top,0px))] pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pl-[max(1.5rem,env(safe-area-inset-left,0px))] pr-[max(1.5rem,env(safe-area-inset-right,0px))] text-center select-none">
         {/* Top Header */}
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-[#A3E635]">
@@ -361,7 +374,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
     const nextExercise = workout.exercises[exerciseIndex + 1];
 
     return (
-      <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-6 select-none">
+      <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-6 pt-[max(1.5rem,env(safe-area-inset-top,0px))] pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pl-[max(1.5rem,env(safe-area-inset-left,0px))] pr-[max(1.5rem,env(safe-area-inset-right,0px))] select-none">
         {/* Header */}
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-[#A3E635]">
@@ -449,7 +462,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
   // VIEW D: ACTIVE EXERCISE SCREEN (WITH ANIMATION PLACEHOLDER)
   // ========================================================
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-5 overflow-y-auto no-scrollbar">
+    <div className="fixed inset-0 z-50 bg-[#0F172A] flex flex-col justify-between p-5 pt-[max(1.25rem,env(safe-area-inset-top,0px))] pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] pl-[max(1.25rem,env(safe-area-inset-left,0px))] pr-[max(1.25rem,env(safe-area-inset-right,0px))] overflow-y-auto no-scrollbar">
       {/* Top Header & Exercise Progress Bar */}
       <div>
         <div className="flex items-center justify-between pb-3">

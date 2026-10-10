@@ -161,7 +161,7 @@ export const DayPreviewModal: React.FC<DayPreviewModalProps> = ({
           </div>
 
           {/* Bottom "Start Workout" Button */}
-          <div className="shrink-0 pt-3 border-t border-slate-800/80">
+          <div className="shrink-0 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] border-t border-slate-800/80">
             <button
               type="button"
               onClick={() => onStartWorkout(workout)}
