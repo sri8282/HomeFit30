@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-navy: #0F172A;
+    --accent-lime: #A3E635;
+  }
+
+  body {
+    background-color: #0b1120;
+    color: #ffffff;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+/* Hide scrollbars while allowing smooth scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom glow utility */
+.glow-lime {
+  box-shadow: 0 0 25px rgba(163, 230, 53, 0.35);
+}
+
+.glow-lime-sm {
+  box-shadow: 0 0 12px rgba(163, 230, 53, 0.25);
+}
+
+/* Pulsing accent ring */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s infinite ease-in-out;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "HomeFit 30",
+  "description": "Mobile-first 30-day home workout app with personalized body metrics, customized training plans, and interactive routines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
