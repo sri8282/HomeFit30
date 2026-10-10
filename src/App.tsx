@@ -189,7 +189,7 @@ export default function App() {
       {landingActiveWorkout && (
         <WorkoutPlayer
           workout={landingActiveWorkout}
-          onFinished={async () => {
+          onFinishWorkout={() => {
             setLandingActiveWorkout(null);
             setScreen('home');
           }}
